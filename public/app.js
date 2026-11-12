@@ -30,7 +30,7 @@ async function changeVariant(next){
  if(portrait&&variant===next){loading=false;hint.textContent='Drag to spin';ui();return;}
  loading=true;hint.textContent=ready?'Changing glasses…':'Loading the spin…';ui();
  try{
-  const loaded=await Turntable.load(`/assets/portrait-v2/${next}/manifest.json`,{highResolution:!saveData});
+  const loaded=await Turntable.load(`/assets/portrait-v2/${next==='glasses'?'glasses-hd':next}/manifest.json`,{highResolution:!saveData});
   if(token!==switchId){loaded.dispose();return;}
   portrait?.dispose();portrait=loaded;variant=next;ready=true;loading=false;
   stage.setAttribute('role','slider');stage.setAttribute('tabindex','0');stage.classList.remove('unavailable');

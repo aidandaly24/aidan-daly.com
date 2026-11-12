@@ -1,8 +1,8 @@
 import {readFile,stat} from 'node:fs/promises';
-for(const variant of ['no-glasses','glasses']) {
+for(const variant of ['no-glasses','glasses-hd']) {
  const dir=`public/assets/portrait-v2/${variant}/`,m=JSON.parse(await readFile(dir+'manifest.json','utf8'));
  if(m.type!=='rendered-turntable'||m.crop.length!==4)throw Error('Invalid rendered portrait manifest');
- if(variant==='no-glasses'&&(m.frames!==144||m.sourceSize!==1024||m.hd?.pages.length!==12))throw Error('High-resolution sequence is incomplete');
+ if((m.frames!==144||m.sourceSize!==1024||m.hd?.pages.length!==12))throw Error('High-resolution sequence is incomplete');
  const files=[m.base,...(m.hd?.pages||[])];
  for(const item of files) {
   if(!/^[a-z0-9-]+\.webp$/.test(item.url))throw Error('Invalid media path');

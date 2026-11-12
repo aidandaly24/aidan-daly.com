@@ -40,6 +40,13 @@ test('layout reserves viewport space for every element and removes the requested
  assert.match(html,/class="figure-viewport"/);assert.match(css,/height:100dvh/);assert.match(css,/100cqh \* 1\.40625/);
 });
 
+test('oversized phone canvas stays centered instead of widening its grid track',async()=>{
+ const css=await readFile('public/style.css','utf8');
+ const viewport=css.match(/\.figure-viewport\{([^}]+)\}/)?.[1];
+ assert.match(viewport,/grid-template-columns:minmax\(0,1fr\)/);
+ assert.match(viewport,/place-items:center/);
+});
+
  test('pointer dragging does not outline the portrait viewport',async()=>{
  const css=await readFile('public/style.css','utf8');
  assert.doesNotMatch(css,/\.figure-viewport:focus-within/);

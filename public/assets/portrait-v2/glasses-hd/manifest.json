@@ -1,0 +1,133 @@
+{
+  "version": "v12-hires-2",
+  "type": "rendered-turntable",
+  "frames": 144,
+  "sourceSize": 1024,
+  "crop": [
+    0.3125,
+    0.0625,
+    0.375,
+    0.90625
+  ],
+  "base": {
+    "url": "base.webp",
+    "columns": 12,
+    "tileWidth": 192,
+    "tileHeight": 464,
+    "bytes": 1136540,
+    "frames": 72
+  },
+  "hd": {
+    "framesPerPage": 12,
+    "pages": [
+      {
+        "url": "hd-00.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 483354,
+        "start": 0,
+        "frames": 12
+      },
+      {
+        "url": "hd-01.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 427322,
+        "start": 12,
+        "frames": 12
+      },
+      {
+        "url": "hd-02.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 336668,
+        "start": 24,
+        "frames": 12
+      },
+      {
+        "url": "hd-03.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 330506,
+        "start": 36,
+        "frames": 12
+      },
+      {
+        "url": "hd-04.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 395104,
+        "start": 48,
+        "frames": 12
+      },
+      {
+        "url": "hd-05.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 411060,
+        "start": 60,
+        "frames": 12
+      },
+      {
+        "url": "hd-06.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 407172,
+        "start": 72,
+        "frames": 12
+      },
+      {
+        "url": "hd-07.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 389650,
+        "start": 84,
+        "frames": 12
+      },
+      {
+        "url": "hd-08.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 340438,
+        "start": 96,
+        "frames": 12
+      },
+      {
+        "url": "hd-09.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 351474,
+        "start": 108,
+        "frames": 12
+      },
+      {
+        "url": "hd-10.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 434144,
+        "start": 120,
+        "frames": 12
+      },
+      {
+        "url": "hd-11.webp",
+        "columns": 4,
+        "tileWidth": 384,
+        "tileHeight": 928,
+        "bytes": 487696,
+        "start": 132,
+        "frames": 12
+      }
+    ]
+  }
+}
