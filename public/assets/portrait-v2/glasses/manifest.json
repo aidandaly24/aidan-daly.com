@@ -1,0 +1,20 @@
+{
+  "version": "v12-hires-2",
+  "type": "rendered-turntable",
+  "frames": 72,
+  "sourceSize": 480,
+  "crop": [
+    0.3125,
+    0.0625,
+    0.375,
+    0.90625
+  ],
+  "base": {
+    "url": "base.webp",
+    "columns": 12,
+    "tileWidth": 180,
+    "tileHeight": 435,
+    "bytes": 880678,
+    "frames": 72
+  }
+}
