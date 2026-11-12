@@ -26,3 +26,16 @@ test('static security and Vercel configuration', async () => {
   assert.equal(config.outputDirectory, 'dist'); assert.equal(config.framework, null);
   assert.ok(config.headers.some(rule => rule.headers.some(h => h.key === 'Content-Security-Policy')));
 });
+
+test('portrait uses every animation frame and native-size interpolation',async()=>{
+ const js=await readFile('public/app.js','utf8');
+ assert.doesNotMatch(js,/lastDraw|t-lastDraw/);
+ assert.match(js,/body.width=frames\[0\].naturalWidth/);
+ assert.match(js,/motion.step\(dt\);draw\(\)/);
+});
+
+test('layout reserves viewport space for every element and removes the requested header label',async()=>{
+ const html=await readFile('public/index.html','utf8'),css=await readFile('public/style.css','utf8');
+ assert.doesNotMatch(html,/<span class="address">/);
+ assert.match(html,/class="figure-viewport"/);assert.match(css,/height:100dvh/);assert.match(css,/100cqh \* 1\.40625/);
+});

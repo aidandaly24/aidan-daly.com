@@ -1,5 +1,9 @@
 export const TAU = Math.PI * 2;
-export const AUTO_SPEED = TAU / 26;
+export const MODEL_TURN_SECONDS = 12;
+export const TEXT_TURN_SECONDS = 26;
+export const AUTO_SPEED = TAU / MODEL_TURN_SECONDS;
+export const TEXT_AUTO_SPEED = TAU / TEXT_TURN_SECONDS;
+export const TEXT_TO_MODEL_RATIO = TEXT_AUTO_SPEED / AUTO_SPEED;
 export const wrap = (n, m = TAU) => ((n % m) + m) % m;
 export class SpinMotion {
   constructor({ reducedMotion = false, paused = false } = {}) {
@@ -7,7 +11,7 @@ export class SpinMotion {
     this.velocity = this.targetVelocity; this.preDragVelocity = this.velocity; this.dragging = false;
   }
   get targetVelocity() { return this.paused || this.reducedMotion ? 0 : AUTO_SPEED; }
-  get textAngle() { return -this.angle; }
+  get textAngle() { return -this.angle * TEXT_TO_MODEL_RATIO; }
   beginDrag() { this.preDragVelocity = this.velocity; this.dragging = true; this.velocity = 0; }
   dragTo(angle) { this.angle = angle; }
   release(pointerVelocity = 0) {

@@ -1,6 +1,6 @@
 # aidan-daly.com
 
-A small, static coming-soon site for Aidan Daly. The homepage has a rendered 360-degree character turntable, pointer/touch dragging, keyboard rotation, a pause control, and reduced-motion and data-saver support. The horizontal typography orbit counter-rotates with the character, including during drag reversals. Same-direction dragging adds speed; opposite dragging reverses, coasts, and returns to the normal auto-spin.
+A small, static coming-soon site for Aidan Daly. The homepage has a rendered 360-degree character turntable, pointer/touch dragging, keyboard rotation, a pause control, and reduced-motion and data-saver support. The figure turns once every 12 seconds while the horizontal typography keeps its 26-second counter-rotation. Both follow the display refresh rate, including during drag reversals. Same-direction dragging adds speed; opposite dragging reverses, coasts, and returns to the normal auto-spin.
 
 ## Development
 
@@ -9,7 +9,7 @@ No runtime dependencies. Node 20 or newer is sufficient.
 - `npm test` checks rotation math, content, accessibility hooks, media completeness, and deployment configuration.
 - `npm run build` copies `public/` to `dist/`.
 
-The intended Vercel configuration serves `dist/`. Publication and the GitHub connection are pending design approval and repository access in Vercel. The primary domain is `aidan-daly.com`. Future projects can use their own Vercel projects and subdomains without changing this site's source or the domain's nameservers. No wildcard domain is attached to this project.
+The intended Vercel configuration serves `dist/`. The site is live at https://aidan-daly.com/. Automatic GitHub-to-Vercel deployment is pending repository access and connection in Vercel; current releases are deployed directly from the reviewed repository files. The primary domain is `aidan-daly.com`. Future projects can use their own Vercel projects and subdomains without changing this site's source or the domain's nameservers. No wildcard domain is attached to this project.
 
 ## Character media
 

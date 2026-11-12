@@ -1,14 +1,14 @@
-import { SpinMotion, TAU, wrap, releaseVelocity } from './motion.js';
+import { SpinMotion, TAU, wrap, releaseVelocity, TEXT_TO_MODEL_RATIO } from './motion.js';
 import { createOrbitRenderer } from './orbit.js';
 const stage=document.querySelector('#figure-stage'),canvas=document.querySelector('#scene'),ctx=canvas.getContext('2d');
 const button=document.querySelector('#motion-toggle'),hint=document.querySelector('#hint-text'),status=document.querySelector('#load-status');
 const reduced=matchMedia('(prefers-reduced-motion: reduce)'),saveData=navigator.connection?.saveData===true;
 const motion=new SpinMotion({reducedMotion:reduced.matches,paused:saveData});
-const body=document.createElement('canvas');body.width=576;body.height=576;const bodyCtx=body.getContext('2d');
-let renderOrbit,poster,frames=[],count=0,ready=false,loading=false,drag=null,visible=true,lastTime=0,lastDraw=-1,lastStats=0;
+const body=document.createElement('canvas');body.width=480;body.height=480;const bodyCtx=body.getContext('2d');
+let renderOrbit,poster,frames=[],count=0,ready=false,loading=false,drag=null,visible=true,lastTime=0,lastStats=0,renderCount=0,renderWindowStart=0,renderFps=0;
 function ui(){button.setAttribute('aria-pressed',String(motion.paused||motion.reducedMotion));button.setAttribute('aria-label',motion.paused||motion.reducedMotion?'Play automatic rotation':'Pause automatic rotation');}
 function toggleMotion(){if(motion.reducedMotion){motion.setReducedMotion(false);motion.setPaused(false);}else motion.setPaused(!motion.paused);ui();stats();}
-function stats(){const d=Math.round(wrap(motion.angle)/TAU*360)%360;stage.setAttribute('aria-valuenow',d);stage.setAttribute('aria-valuetext',d<10||d>350?'Facing forward':`${d} degrees`);stage.dataset.rotation=motion.angle.toFixed(4);stage.dataset.speed=motion.velocity.toFixed(4);stage.dataset.textRotation=motion.textAngle.toFixed(4);stage.dataset.framesReady=String(ready);}
+function stats(){const d=Math.round(wrap(motion.angle)/TAU*360)%360;stage.setAttribute('aria-valuenow',d);stage.setAttribute('aria-valuetext',d<10||d>350?'Facing forward':`${d} degrees`);stage.dataset.rotation=motion.angle.toFixed(4);stage.dataset.speed=motion.velocity.toFixed(4);stage.dataset.textRotation=motion.textAngle.toFixed(4);stage.dataset.framesReady=String(ready);stage.dataset.textSpeed=(-motion.velocity*TEXT_TO_MODEL_RATIO).toFixed(4);stage.dataset.renderFps=renderFps.toFixed(1);}
 function draw(){
  if(!ctx||!renderOrbit||!poster)return;
  const ratio=Math.min(devicePixelRatio||1,2),width=Math.round(stage.clientWidth*ratio),height=Math.round(width*640/900);
@@ -17,8 +17,8 @@ function draw(){
  renderOrbit(ctx,motion.textAngle,false);
  if(ready){
   const index=wrap(-motion.angle)/TAU*count,first=Math.floor(index)%count,second=(first+1)%count,fraction=index-Math.floor(index);
-  bodyCtx.clearRect(0,0,576,576);bodyCtx.globalCompositeOperation='source-over';bodyCtx.globalAlpha=1-fraction;bodyCtx.drawImage(frames[first],0,0,576,576);
-  bodyCtx.globalCompositeOperation='lighter';bodyCtx.globalAlpha=fraction;bodyCtx.drawImage(frames[second],0,0,576,576);
+  bodyCtx.clearRect(0,0,body.width,body.height);bodyCtx.globalCompositeOperation='source-over';bodyCtx.globalAlpha=1-fraction;bodyCtx.drawImage(frames[first],0,0,body.width,body.height);
+  bodyCtx.globalCompositeOperation='lighter';bodyCtx.globalAlpha=fraction;bodyCtx.drawImage(frames[second],0,0,body.width,body.height);
   bodyCtx.globalCompositeOperation='source-over';bodyCtx.globalAlpha=1;ctx.drawImage(body,146.2,3.5,607.5,607.5);
  }else ctx.drawImage(poster,146.2,3.5,607.5,607.5);
  renderOrbit(ctx,motion.textAngle,true);stage.classList.add('drawn');
@@ -27,7 +27,7 @@ async function image(url){const x=new Image();x.decoding='async';x.src=url;await
 async function loadFrames(){
  if(loading||ready)return;loading=true;hint.textContent='Loading the spin…';
  try{const response=await fetch('/assets/turntable/manifest.json');if(!response.ok)throw Error('media');const manifest=await response.json();count=manifest.frames;if(!Number.isInteger(count)||count<2||count>240)throw Error('manifest');
- const total=count,pending=new Array(total);let next=0;await Promise.all(Array.from({length:4},async()=>{while(next<total){const i=next++;pending[i]=await image(`/assets/turntable/frame-${String(i).padStart(3,'0')}.webp?v=${encodeURIComponent(manifest.version||'1')}`);}}));frames=pending;
+ const total=count,pending=new Array(total);let next=0;await Promise.all(Array.from({length:4},async()=>{while(next<total){const i=next++;pending[i]=await image(`/assets/turntable/frame-${String(i).padStart(3,'0')}.webp?v=${encodeURIComponent(manifest.version||'1')}`);}}));frames=pending;body.width=frames[0].naturalWidth;body.height=frames[0].naturalHeight;
  ready=true;loading=false;stage.setAttribute('role','slider');stage.setAttribute('tabindex','0');stage.classList.remove('unavailable');button.hidden=false;hint.textContent='Drag to spin';status.textContent='Ready. Drag either direction or use the arrow keys. Space pauses rotation.';stats();draw();
  }catch{loading=false;hint.textContent='Portrait preview';status.textContent='The portrait is available. Interactive rotation could not load.';stage.removeAttribute('role');stage.removeAttribute('tabindex');stage.classList.add('unavailable');}
 }
@@ -40,5 +40,5 @@ stage.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home',' '].i
 button.addEventListener('click',toggleMotion);
 reduced.addEventListener('change',e=>{motion.setReducedMotion(e.matches);ui();draw();stats();});
 new IntersectionObserver(e=>{visible=e[0].isIntersecting;},{threshold:.05}).observe(stage);window.addEventListener('resize',draw);
-function animate(t){const dt=Math.min((t-lastTime)/1000,.05);lastTime=t;if(ready&&visible&&!document.hidden){motion.step(dt);if(t-lastDraw>=25){draw();lastDraw=t;}if(t-lastStats>200){stats();lastStats=t;}}requestAnimationFrame(animate);}
+function animate(t){const dt=Math.min((t-lastTime)/1000,.1);lastTime=t;if(ready&&visible&&!document.hidden){motion.step(dt);draw();renderCount++;if(t-renderWindowStart>=1000){renderFps=renderCount*1000/(t-renderWindowStart);renderWindowStart=t;renderCount=0;}if(t-lastStats>200){stats();lastStats=t;}}else{renderCount=0;renderWindowStart=t;}requestAnimationFrame(animate);}
 ui();init();requestAnimationFrame(animate);

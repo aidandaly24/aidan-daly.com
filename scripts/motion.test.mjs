@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SpinMotion, AUTO_SPEED, wrap } from '../public/motion.js';
+import { SpinMotion, AUTO_SPEED, TEXT_AUTO_SPEED, TEXT_TO_MODEL_RATIO, TAU, wrap } from '../public/motion.js';
 const advance = (m, seconds) => { for (let t=0;t<seconds;t+=1/120) m.step(1/120); };
 test('normal spin and lettering rotate in opposite directions', () => {
- const m = new SpinMotion(); advance(m, 1); assert.ok(m.angle>0); assert.equal(m.textAngle,-m.angle);
+ const m = new SpinMotion(); advance(m, 1); assert.ok(m.angle>0); assert.equal(m.textAngle,-m.angle*TEXT_TO_MODEL_RATIO);
 });
 test('dragging with normal spin adds speed and coasts back to baseline', () => {
  const m = new SpinMotion(); m.beginDrag(); m.dragTo(1); m.release(2);
@@ -12,7 +12,7 @@ test('dragging with normal spin adds speed and coasts back to baseline', () => {
 });
 test('opposite drag reverses, slows, then resumes normal direction', () => {
  const m = new SpinMotion(); m.beginDrag(); m.dragTo(-1); m.release(-2); assert.ok(m.velocity<0);
- const a=m.angle;advance(m,.25);assert.ok(m.angle<a);assert.equal(m.textAngle,-m.angle);
+ const a=m.angle;advance(m,.25);assert.ok(m.angle<a);assert.equal(m.textAngle,-m.angle*TEXT_TO_MODEL_RATIO);
  advance(m,8); assert.ok(m.velocity>0); advance(m,15);assert.ok(Math.abs(m.velocity-AUTO_SPEED)<.00001);
 });
 test('even a gentle opposite release reverses', () => { const m=new SpinMotion();m.release(-.07);assert.ok(m.velocity<0); });
@@ -35,4 +35,10 @@ test('slow or held drag release keeps direction with gentle momentum',()=>{
   assert.ok(releaseVelocity({velocity:4,direction:1,moved:true,age:10})>3.9);
   assert.equal(releaseVelocity({velocity:4,direction:1,moved:true,cancelled:true}),0);
   assert.equal(releaseVelocity({velocity:4,direction:1,moved:false}),0);
+});
+
+test('figure turns in12 seconds while lettering keeps its26-second pace',()=>{
+ const m=new SpinMotion();m.step(12);assert.ok(Math.abs(m.angle-TAU)<1e-12);
+ assert.ok(Math.abs(m.textAngle+12*TEXT_AUTO_SPEED)<1e-12);
+ assert.ok(Math.abs(TEXT_AUTO_SPEED-TAU/26)<1e-12);
 });

@@ -7,3 +7,21 @@
 @media(max-height:800px) and (min-width:601px){main{min-height:590px;padding-top:27px}.intro h1{margin-bottom:15px}.figure-section{max-width:700px}footer{padding-top:20px;padding-bottom:24px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important}}
 .figure-stage.unavailable{cursor:default}
+
+/* Fit the complete composition to the usable viewport rather than hiding page overflow. */
+html{min-width:0;min-height:100%;}
+body{height:100svh;height:100dvh;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;}
+.masthead{padding:clamp(12px,3vh,27px) clamp(20px,4.45vw,64px) 0;}
+.monogram{font-size:clamp(30px,5.4vh,46px);}
+main{min-height:0;padding:clamp(8px,2vh,20px) 16px;display:grid;grid-template-rows:auto minmax(0,1fr);gap:clamp(8px,2vh,24px);justify-items:center;align-items:stretch;overflow:visible;}
+.intro h1{font-size:clamp(17px,2.8vh,23px);margin:0;line-height:1.35;}
+.figure-section{width:100%;max-width:none;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) 44px;gap:4px;align-items:stretch;}
+.figure-viewport{width:100%;height:100%;min-height:0;display:grid;place-items:center;container-type:size;overflow:clip;border-radius:20px;}
+.figure-viewport:focus-within{outline:2px solid #867357;outline-offset:-4px;}
+.figure-stage{width:min(900px,100cqw,calc(100cqh * 1.40625));max-width:none;min-width:0;outline:none!important;}
+.figure-controls{min-height:44px;margin:0;gap:10px;}
+.figure-controls button{width:40px;height:40px;padding:12px;}
+footer{padding:8px clamp(20px,4.45vw,64px) clamp(10px,2.6vh,24px);font-size:clamp(8px,1.25vh,10px);line-height:1.4;}
+@media(max-width:600px){.figure-stage{width:min(900px,122cqw,calc(100cqh * 1.40625));}.figure-controls{font-size:11px;}.monogram{font-size:clamp(30px,5.4vh,39px);}}
+@media(max-height:440px){main{padding-top:6px;padding-bottom:4px;gap:4px;}.masthead{padding-top:10px;}.monogram{font-size:29px;}.intro h1{font-size:17px;}footer{padding-bottom:10px;}.figure-section{grid-template-rows:minmax(0,1fr) 40px;gap:0;}}
+main{grid-template-columns:minmax(0,1fr);justify-content:stretch;}
