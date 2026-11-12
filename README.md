@@ -4,6 +4,8 @@ A small, static coming-soon site for Aidan Daly. The homepage has a rendered 360
 
 ## Development
 
+The next Bookshelf City design is staged at `/bookshelf/` without replacing the current homepage. See [the implementation and verification notes](docs/bookshelf-city.md) and [artwork provenance](docs/bookshelf-assets.md).
+
 No runtime dependencies. Node 20 or newer is sufficient.
 
 - `npm test` checks rotation math, content, accessibility hooks, media completeness, and deployment configuration.
