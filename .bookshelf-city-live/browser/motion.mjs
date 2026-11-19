@@ -18,8 +18,9 @@ export function segment(from,to,start,end,previous,next,carrying,layout=0) {
   const depths = routeDepths(layout);
   const distance = Math.hypot(projected, depths[to]-depths[from]);
   const surface = terrain(from,to);
-  const speed = surface === 'ladder' ? 49 : surface === 'stair' ? 58 : carrying ? 86 : 98;
-  return {from,to,start,end,d:distance,projected,surface,elapsed:0,T:Math.max(.31,distance/speed),
+  const crossingPage = from==='notebook' || to==='notebook';
+  const speed = crossingPage ? 68 : surface === 'ladder' ? 49 : surface === 'stair' ? 58 : carrying ? 86 : 98;
+  return {from,to,start,end,d:distance,projected,surface,crossingPage,elapsed:0,T:Math.max(.31,distance/speed),
     entry: previous === surface ? .92 : .28, exit: next === surface ? .92 : .28};
 }
 
@@ -43,7 +44,7 @@ export function updateFeet(a,g,u,dt) {
     if (error(i) > (terminal ? 1 : stride*.78)) {
       const target = stance(i);
       if (!terminal) {
-        const lead = Math.min(1, u+duration/g.T*.86);
+        const lead = Math.min(1, u+duration/g.T*(g.crossingPage?1.34:.86));
         let f = progress(g,lead);
         if (surface === 'ladder') {
           // Six registered intervals along the inclined ladder. Plant on a

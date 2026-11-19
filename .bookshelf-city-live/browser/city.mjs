@@ -180,13 +180,20 @@ export class City{
      if(a.kind!=='work') continue;
      if(a.job==='type') {
        if(a.riseAt!=null) {
-         a.work=mix(seatedWork,1,clamp((this.clock-a.riseAt)/leaveChairSeconds));
+         const exit=clamp((this.clock-a.riseAt)/leaveChairSeconds);
+         const first=this.point(a.paths[this.l][1]), from=this.point(a.at);
+         const heading=Math.atan2(first[0]-from[0],Math.abs(first[1]-from[1])*.65+8);
+         const facing=1.07+turnDelta(1.07,heading)*sm(clamp((exit-.50)/.50));
+         a.yaw+=Math.max(-.095,Math.min(.095,turnDelta(a.yaw,facing)));
+         a.gaze=a.yaw;
+         a.work=mix(seatedWork,1,exit);
          if(a.work>=1) {
            this.event('typed',a.i,a.at);
            this.depart(a);
            dispatch=true;
          }
        } else {
+         a.yaw+=turnDelta(a.yaw,1.07)*(1-Math.exp(-dt*3.1));
          a.work=Math.min(seatedWork,a.age/a.dwell);
          if(a.work===seatedWork&&!this.queue.includes(a.i)) {
            this.queue.push(a.i);

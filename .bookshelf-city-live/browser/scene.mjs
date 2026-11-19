@@ -14,6 +14,57 @@ function piece(p,g,c,s){let m=new T.Mesh(g,material(c));p.add(m);m.scale.set(...
 function ell(p,c,s){return piece(p,globe,c,s)}
 function line(p,c,r){let m=piece(p,tube,c,[r,1,r]);return(a,b)=>{m.position.copy(blend(a,b,.5));m.quaternion.setFromUnitVectors(Y,b.clone().sub(a).normalize());m.scale.y=a.distanceTo(b)}}
 function joint(a,b,pole,r1,r2){let d=b.clone().sub(a),u=d.length();if(u<.001)return a.clone();d.divideScalar(u);let w=pole.clone().sub(d.clone().multiplyScalar(pole.dot(d))).normalize();let v=Math.max(-r1,Math.min(r1,(r1*r1-r2*r2+u*u)/(2*u)));return a.clone().addScaledVector(d,v).addScaledVector(w,Math.sqrt(Math.max(0,r1*r1-v*v)))}
+// A seated visit can last as long as a shared passage is busy. Independent
+// screen-reading and keyboard phrases keep running throughout that wait.
+const keyOrder = [0,4,1,3,0,5,2,3,4,0,3,1];
+function deskPhrase(a) {
+  const seconds = a.age + a.i*.79 + (a.visits%4)*.43;
+  const period = 7.7 + ((a.i+a.visits)%3)*.65;
+  const beat = seconds % period;
+  const read = window(beat,3.12,3.75,4.60,5.06)
+    + window(beat,period-1.13,period-.66,period-.24,period);
+  const restHand = window(beat,3.36,3.93,4.41,5.09);
+  const clock = seconds*5.55 + .20*Math.sin(seconds*1.65);
+  const index = Math.floor(clock);
+  const tap = (1-read)*Math.sin(Math.PI*(clock-index))**2;
+  return {read, restHand, key:keyOrder[index % keyOrder.length], tap,
+    leftRow:Math.sin(seconds*2.1+.4), rightRow:Math.sin(seconds*1.73+1.6),
+    breath:Math.sin(seconds*1.47)};
+}
+
+const fingerBindings = new WeakMap();
+function bindTypingFingers(body) {
+  if(fingerBindings.has(body)) return fingerBindings.get(body);
+  const named = new Map();
+  body.traverse(o=>{if(o.isBone) named.set(o.userData.name??o.name,o);});
+  const digits = ['R','L'].flatMap(side=>['index','middle','ring'].map(name=>{
+    const first=named.get(name+'_01.'+side), second=named.get(name+'_02.'+side);
+    return first && second ? {first,second,rest:first.quaternion.clone(),distal:second.quaternion.clone()} : null;
+  }));
+  let active=false;
+  const axis=new T.Vector3(), stem=new T.Vector3(), parentWorld=new T.Quaternion();
+  const downward=new T.Vector3(0,-1,0), rotation=new T.Quaternion();
+  const apply=(phrase,weight)=>{
+    if(!active && !weight) return;
+    active=Boolean(weight);
+    for(const [i,d] of digits.entries()) {
+      if(!d) continue;
+      d.first.quaternion.copy(d.rest);d.second.quaternion.copy(d.distal);
+      if(!weight || phrase.key!==i) continue;
+      d.first.parent.getWorldQuaternion(parentWorld);
+      stem.copy(d.second.position).applyQuaternion(d.rest).applyQuaternion(parentWorld).normalize();
+      axis.crossVectors(stem,downward);
+      if(axis.lengthSq()<.001) continue;
+      axis.normalize().applyQuaternion(parentWorld.invert());
+      rotation.setFromAxisAngle(axis,.33*phrase.tap*weight);
+      d.first.quaternion.premultiply(rotation);
+      axis.applyQuaternion(d.first.quaternion.clone().invert());
+      d.second.quaternion.premultiply(rotation.setFromAxisAngle(axis,.22*phrase.tap*weight));
+    }
+  };
+  fingerBindings.set(body,apply);
+  return apply;
+}
 function makeFigure(scene){let base=new T.Group;scene.add(base);const skin=0xe4b28a,shirt=0x647b6a,pant=0x354c61,hair=0x493528;
 let torso=ell(base,shirt,[23,38,15]),hip=ell(base,pant,[21,13,14]),neck=ell(base,skin,[8,11,8]),head=new T.Group;base.add(head);
 let face=ell(head,skin,[20,24,18]);let cap=ell(head,hair,[21,14,19]);cap.position.set(0,15,-1);
@@ -27,10 +78,12 @@ const stoolContact=l?V(644,h-1328,29):V(1201,h-764,29);
 let nativeActors, ground, stoolTool;
 const carryFrame = new T.Object3D();
 const supportMotion = [{}, {}];
+const typingFingers = [];
 function setActors(actors) {
   nativeActors = actors;
   for (const [i, actor] of actors.entries()) {
     scene.add(actor.body);
+    typingFingers[i] = bindTypingFingers(actor.body);
     figs[i].base.visible = false;
   }
 }
@@ -57,9 +110,15 @@ function setEnvironment(set) {
 
 function sync(c){const stool = stoolTool?.sync(c);let own=c.plank.owner;let actorHands=[];for(let a of c.a){let f=figs[a.i],isWork=a.kind==='work',t=isWork?a.work:0,pres=env(t),carry=own===a.i;
 const typing=isWork&&a.job==='type';
+const phrase=typing?deskPhrase(a):null;
+const idleTime=a.kind==='wait'?Math.max(0,a.age-a.dwell):(a.waited??0);
+const idle=a.kind==='wait'?ramp(idleTime,0,.8):
+  a.kind==='travel'?ramp(idleTime,0,.8)*(1-ramp(c.clock-(a.departedAt??c.clock),0,.60)):0;
+const attention=idle*Math.sin((idleTime+(a.kind==='travel'?c.clock-(a.departedAt??c.clock):0))*.81+a.i*.5);
 const seated=typing?window(t,.045,.195,.81,.95):0;
 const brace=typing?window(t,0,.085,.94,1):0;
 const keyboard=typing?window(t,.15,.21,.80,.88):0;
+const typingPulse=keyboard*(typing?ramp(t,.195,.25):0);
 const build=isWork&&a.job==='stack'?window(t,.015,.21,.83,.99):0;
 const repairing = stool && stool.actor === a.i ? stool : null;
 const inspect = repairing?.crouch ?? (isWork&&a.job==='inspect'?window(t,.035,.21,.80,.98):0);
@@ -113,13 +172,17 @@ hip.z-=build*6;
 hip.y-=build*19;
 hip.addScaledVector(fw,inspect*14);
 hip.y-=inspect*55;
-const lean=seated*4+build*9+inspect*10;
+const deskLean=keyboard*(phrase?.read??0);
+const lean=seated*4+build*9+inspect*10+deskLean*3;
 const shoulder=hip.clone().add(V(0,69+seated*25,0)).addScaledVector(fw,lean);
 const head=shoulder.clone().add(V(0,31+seated*14,0)).addScaledVector(fw,4);
 const survey=a.job==='look'&&isWork?.52*(ramp(t,.08,.30)-2*ramp(t,.36,.63)+ramp(t,.73,.98)):0;
 let gaze=travelling?(a.gaze??a.yaw)+bodyMotion.turn:turn+survey;
+gaze += keyboard*(phrase ? .15*phrase.read-.075*phrase.rightRow*(1-phrase.read) : 0);
+gaze += attention*.26;
 const handling=isWork&&['pick','place'].includes(a.job);
-let downward=keyboard*.18+build*.21+inspect*.30+(handling?pres*.22:0);
+let downward=keyboard*(.20-.23*(phrase?.read??0))+build*.21+inspect*.30+(handling?pres*.22:0);
+downward+=idle*(a.job==='stack'||a.job==='inspect'?.18:.06)+attention*.045;
 if (repairing) {
   const toTarget = repairing.gaze.clone().sub(head);
   gaze += T.MathUtils.clamp(turnDelta(gaze,Math.atan2(toTarget.x,toTarget.z)),-.64,.64)*repairing.gazeWeight;
@@ -168,6 +231,11 @@ leg.sole.copy(F);leg.sole.y-=5;
 leg.thigh(H,leg.knee);leg.shin(leg.knee,F);leg.shoe.position.copy(F).addScaledVector(fw,5);leg.shoe.rotation.set(pitch,turn,0,'YXZ');
 const S=shoulder.clone().addScaledVector(rt,17*s);
 const hand=hip.clone().addScaledVector(rt,21*s).addScaledVector(fw,16*support*s).add(V(0,9+3*stride,0));
+if (idle && !carry) {
+  const resting=hip.clone().addScaledVector(rt,s*(i?23:18)).addScaledVector(fw,i?8:20)
+    .add(V(0,(i?3:17)+attention*2,0));
+  hand.lerp(resting,idle*(i?.58:.88));
+}
 if(climbGrip>.001){
   // Match the opposite foot's progression up or down the rung, keeping the
   // other hand on its previous rung while that foot and hand are in flight.
@@ -177,15 +245,29 @@ if(climbGrip>.001){
   const palmY=Math.max(upper[1]-5,rung[1]-4.9*rungHeight);
   const railX=mix(lower[0],upper[0],clamp((lower[1]-palmY)/(lower[1]-upper[1])));
   const contact=ground?.rung([railX,palmY],12*s) ?? V(railX+12*s,h-palmY,9);
+  if(ground && a.swing?.i===1-i) {
+    const swing=a.swing;
+    const palmMark=p=>[p[0],Math.max(upper[1]-5,p[1]-4.9*rungHeight)];
+    const start=ground.rung(palmMark(swing.s),12*s), end=ground.rung(palmMark(swing.tar),12*s);
+    contact.copy(start).lerp(end,sm(clamp(swing.t/swing.T)));
+  }
   contact.y+=rung[2]*.35;
-  hand.lerp(contact,climbGrip);
+  // Release an out-of-reach bar before it drags the whole pelvis toward
+  // the ladder. These offsets match the real donor shoulder and arm span.
+  const armSocket=hip.clone().addScaledVector(rt,23*s*actorSize).add(V(0,39*actorSize,0)).addScaledVector(fw,8);
+  const reachable=1-ramp(armSocket.distanceTo(contact)/actorSize,45,68);
+  hand.lerp(contact,climbGrip*reachable);
 }
 const tip=deskHands[i];
-const typingPulse=keyboard*(typing?ramp(t,.215,.25):0);
 const tipPose=V(tip[0],h-tip[1],28+i*3);
 const keyTarget=ground?.anchor('keyboard'+i,tipPose,'desk') ?? tipPose;
-keyTarget.x+=Math.sin(t*48+i)*3*typingPulse;
-keyTarget.y+=Math.max(0,Math.sin(t*67+i*3))*3*typingPulse;
+if (phrase) {
+  const row=i?phrase.leftRow:phrase.rightRow;
+  const handTap=Math.floor(phrase.key/3)===i?phrase.tap:0;
+  keyTarget.x+=(row*2.6*(1-phrase.read)+(i?-5:3)*phrase.restHand)*typingPulse;
+  keyTarget.y+=(1.5*handTap+phrase.restHand*(i?1:3))*typingPulse;
+  keyTarget.z+=(row*1.2+(i?4:1)*phrase.restHand)*typingPulse;
+}
 hand.lerp(keyTarget,keyboard);
 if (repairing) {
   hand.lerp(i === 0 ? repairing.rightPalm : repairing.leftPalm,
@@ -213,14 +295,15 @@ if (nativeActors) {
   });
   nativeActors[a.i].sync({
     size: actorSize, yaw: turn, hip, head: f.head.rotation,
-    lean: seated*.22+build*.18+inspect*.58+low*.95+stride*.075+(a.climb??0)*.16,
-    twist: carry ? support*.045 : support*.17, bank: support*.085,
+    lean: seated*.22+deskLean*.09+keyboard*(phrase?.breath??0)*.015+build*.18+inspect*.58+low*.95+stride*.075+(a.climb??0)*.16,
+    twist: (carry ? support*.045 : support*.17) + attention*.042 + deskLean*.045, bank: support*.085+attention*.018,
     footPitch: a.footPitch,
     palms: freeHands, elbows: f.arms.map(arm => arm.elbow), elbowDirections, elbowDirectionWeight,
     soles: f.legs.map(leg => leg.sole), knees: f.legs.map(leg => leg.knee),
     handContact: contact, wristPitch: -1.2*contact,
     toolTurn: repairing?.wristTurn, toolAxis: repairing?.axis,
   });
+  typingFingers[a.i]?.(phrase,typingPulse);
 }
 if(isWork&&a.job==='stack')roof.position.copy(roofP);f.grip.position.copy(f.arms[1].p.position);f.grip.rotation.set(0,propYaw,0);
 if(carry && nativeActors && ground) {
