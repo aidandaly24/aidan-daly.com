@@ -31,6 +31,13 @@ export function lightActor(model) {
     if (!object.isMesh) return;
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of materials) {
+      if (/^Aidan hair[ |]/.test(material.name) && !material.userData.setHair) {
+        // Preserve the native fiber color differences in the room's warmer fill.
+        material.color.r *= 1.83;
+        material.color.g *= 1.32;
+        material.color.b *= 1.04;
+        material.userData.setHair = true;
+      }
       if (!material.isMeshStandardMaterial || !studioMaterials.test(material.name)) continue;
       material.toneMapped = false;
       material.onBeforeCompile = compileStudio;

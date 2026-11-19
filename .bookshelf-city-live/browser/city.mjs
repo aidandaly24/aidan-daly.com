@@ -1,13 +1,16 @@
+import { terrain, segment, progress, updateFeet, turnDelta } from './motion.mjs';
 // The authored plates have different book stacks. A single named graph embeds separately into each art camera.
 export const nodes={
- desk:[[346,914],[360,1283]],floor:[[561,927],[533,1285]],toe:[[770,866],[784,1230]],s1:[[763,796],[731,1146]],s2:[[731,728],[672,1058]],s3:[[688,664],[624,971]],cross:[[713,641],[360,826]],
+ desk:[[346,914],[360,1283]],floor:[[561,927],[533,1285]],toe:[[770,866],[784,1286]],s1:[[763,796],[731,1146]],s2:[[731,728],[672,1058]],s3:[[688,664],[624,971]],cross:[[713,641],[360,826]],
  mid:[[813,630],[424,816]],east:[[963,641],[559,829]],pass:[[1057,645],[646,865]],ledge:[[1212,672],[741,877]],ladder0:[[1414,694],[850,872]],ladder1:[[1371,545],[803,699]],upper:[[1331,540],[749,692]],blocks:[[1236,541],[691,688]],overlook:[[603,649],[269,826]],westDock:[[684,643],[329,831]],eastDock:[[997,638],[597,818]], notebook:[[836,930],[533,1350]],stool:[[1152,888],[587,1454]]};
 const pairs='desk-floor floor-notebook notebook-stool floor-toe toe-s1 s1-s2 s2-s3 s3-cross cross-mid cross-westDock cross-overlook mid-east east-eastDock east-pass pass-ledge ledge-ladder0 ladder0-ladder1 ladder1-upper upper-blocks'.split(' ').map(x=>x.split('-'));
 // The portrait staircase rises into the RIGHT approach; do not walk through the arch face.
 export const edges=l=>pairs.map(([a,b])=>l===1&&a==='s3'&&b==='cross'?[a,'pass']:[a,b]);
 export const bays=['desk','blocks','westDock','eastDock','overlook','stool']; const docks=['westDock','eastDock'];export const dt=1/60;
 export const mix=(a,b,t)=>a+(b-a)*t,sm=t=>t*t*(3-2*t), dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
-const clamp=(t)=>Math.max(0,Math.min(1,t)); const angle=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
+const clamp=(t)=>Math.max(0,Math.min(1,t));
+const seatedWork = .70;
+const leaveChairSeconds = 1.65;
 function rng(n){return()=>{n=(n+0x6d2b79f5)|0;let t=Math.imul(n^(n>>>15),1|n);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296}}
 function nearSeg(p,a,b){let v=[b[0]-a[0],b[1]-a[1]],t=clamp(((p[0]-a[0])*v[0]+(p[1]-a[1])*v[1])/(v[0]**2+v[1]**2||1));return dist(p,[a[0]+v[0]*t,a[1]+v[1]*t])}
 function passagesOverlap(path, otherPath, layout) {
@@ -56,16 +59,18 @@ export class City{
        const start = points[i], end = points[i + 1];
        actor.p = start.map((x, axis) => mix(x, end[axis], fraction));
        const from = trip.path[i], to = trip.path[i + 1];
-       const ladder = [from, to].includes('ladder0') && [from, to].includes('ladder1');
-       // Invert the travel easing to continue from this point on the next tick.
-       const edge = 0.14;
-       const eased = fraction * (1 - edge);
-       const u = eased < edge / 2 ? Math.sqrt(2 * edge * eased) :
-         eased > 1 - 1.5 * edge ? 1 - Math.sqrt(Math.max(0, 2 * edge * (1 - edge - eased))) :
-         eased + edge / 2;
-       const duration = Math.max(0.4, lengths[i] / (ladder ? 68 : 112));
-       actor.seg = fraction >= 1 ? null : { from, to, start, end, d: lengths[i],
-         elapsed: duration * u, T: duration, ladder };
+       const previous = i > 0 ? terrain(trip.path[i-1],from) : null;
+       const nextSurface = i+2 < trip.path.length ? terrain(to,trip.path[i+2]) : null;
+       const g = segment(from,to,start,end,previous,nextSurface,this.plank.owner===actor.i,layout);
+       let lo=0, hi=1;
+       for (let k=0;k<24;k++) {
+         const mid=(lo+hi)/2;
+         if (progress(g,mid)<fraction) lo=mid;
+         else hi=mid;
+       }
+       g.elapsed = g.T*(lo+hi)/2;
+       actor.seg = fraction >= 1 ? null : g;
+       actor.surface = g.surface;
        actor.node = to;
        actor.route = trip.path.slice(i + 2);
      }
@@ -86,22 +91,134 @@ export class City{
  opts.push({x,paths,deliver,w})}
  if(!opts.length)return false;
  let t=this.r()*opts.reduce((n,o)=>n+o.w,0);let o=opts.find(e=>(t-=e.w)<=0)||opts.at(-1);if(o.deliver){this.lock[o.deliver]=a.i;a.deliver=o.deliver}
- this.lock[o.x]=a.i;delete this.lock[a.at];a.paths=o.paths;a.route=o.paths[this.l].slice(1);a.goal=o.x;a.kind='travel';a.seg=null;a.work=0;this.event('depart',a.i,o.x);return true}
- walk(a){if(!a.seg){if(!a.route.length){ // settle BOTH soles at the terminal mark, without snapping a swing.
- if(a.swing||a.feet.some((v,i)=>dist(v,[a.p[0]+(i?8:-8),a.p[1]])>1)){this.feet(a,{start:a.p,end:a.p,d:1,ladder:false},1);return}
- a.paths=null;a.at=a.goal;a.goal=null;a.kind='work';a.age=0;a.work=0;a.visits++;a.last[a.at]=this.clock;a.dwell=2.4+this.r()*2.6;a.job=a.at==='desk'?'type':a.at==='blocks'?'stack':a.at==='overlook'?'look':a.at==='stool'?'inspect':this.plank.owner===a.i?'place':'pick';if(a.job==='stack')this.cube.owner=a.i;this.event('arrive',a.i,a.at);return}
- const to=a.route.shift(),end=this.point(to),start=[...a.p],d=dist(start,end),ladder=[a.node||a.at,to].includes('ladder0')&&[a.node||a.at,to].includes('ladder1');a.seg={from:a.node||a.at,to,start,end,elapsed:0,d,T:Math.max(.4,d/(ladder?68:112)),ladder};a.node=to}
- let g=a.seg;g.elapsed+=dt;let u=clamp(g.elapsed/g.T); // linear core, eased .12-s acceleration/brake per corner
- let k=.14, v=u<k?u*u/(2*k):u>1-k?(1-k)-(1-u)*(1-u)/(2*k):u-k/2; v/=1-k;
- let prev=[...a.p];a.p=[mix(g.start[0],g.end[0],v),mix(g.start[1],g.end[1],v)];let dx=g.end[0]-g.start[0];let target=g.ladder?.18:(dx>=0?1.22:-1.22);a.yaw+=Math.sign(angle(a.yaw,target))*Math.min(Math.abs(angle(a.yaw,target)),dt*3.4);
- a.climb=g.ladder?Math.sin(Math.PI*u):0;a.steps+=dist(prev,a.p);this.feet(a,g,u); if(u===1)a.seg=null}
- feet(a,g,u){ // 2D art-ground contact anchors: only one shoe changes during any swing.
- let dir=[(g.end[0]-g.start[0])/(g.d||1),(g.end[1]-g.start[1])/(g.d||1)];if(!a.swing){if(u===1&&dist(a.feet[a.leg],[a.p[0]+(a.leg?8:-8),a.p[1]])<=1)a.leg=1-a.leg;let i=a.leg,p=a.feet[i],norm=[a.p[0]+(i?8:-8),a.p[1]];if(dist(p,norm)>9||(u===1&&dist(p,norm)>1)){let off=u>.78?0:12,tar=[norm[0]+off*dir[0],norm[1]+off*dir[1],0];a.swing={i,s:[...p],tar,t:0,T:.18};a.leg=1-i}}
- if(a.swing){let s=a.swing;s.t+=dt;let t=clamp(s.t/s.T);a.feet[s.i]=[mix(s.s[0],s.tar[0],sm(t)),mix(s.s[1],s.tar[1],sm(t)),(g.ladder?14:8)*Math.sin(t*Math.PI)];if(t>=1){a.feet[s.i][2]=0;a.swing=null}}}
- tick(){let dispatch=false;this.clock+=dt;for(let a of this.a){if(a.kind==='travel'){this.walk(a);if(a.kind==='work')dispatch=true;continue}
- a.age+=dt;if(a.kind==='work'){a.work=clamp(a.age/a.dwell);if(a.job==='pick'&&a.work>=.5&&this.plank.owner===null){if(this.plank.at!==a.at)throw Error('wrong pick');this.plank.owner=a.i;this.plank.at=null;this.event('pickup',a.i,a.at)}
- if(a.job==='place'&&a.work>=.5&&this.plank.owner===a.i){this.plank.owner=null;this.plank.at=a.at;a.deliver=null;this.event('placed',a.i,a.at)}
- if(a.work>=1){if(a.job==='stack'){this.cube.owner=null;this.event('stacked',a.i,a.at)}if(a.job==='type')this.event('typed',a.i,a.at);a.kind='wait';this.queue.push(a.i);dispatch=true} }
+ this.lock[o.x]=a.i;
+ a.paths=o.paths;
+ a.goal=o.x;
+ if(a.kind==='work'&&a.job==='type'){
+   // Keep both ends and the whole path reserved throughout the chair exit.
+   a.riseAt=this.clock;
+   this.event('reserved',a.i,o.x);
+ } else this.depart(a);
+ return true}
+ depart(a){
+   a.waited=a.kind==='wait'?Math.max(0,a.age-a.dwell):0;
+   a.departedAt=this.clock;
+   delete this.lock[a.at];
+   a.route=a.paths[this.l].slice(1);
+   a.riseAt=null;
+   a.kind='travel';
+   a.seg=null;
+   a.node=a.at;
+   a.surface=null;
+   a.work=0;
+   this.event('depart',a.i,a.goal);
  }
- if(dispatch){for(let i of [...this.queue]){if(this.choose(this.a[i]))this.queue.splice(this.queue.indexOf(i),1)}}}
+ walk(a) {
+   if (!a.seg && !a.route.length) {
+     updateFeet(a,null,1,dt);
+     if (a.swing || a.feet.some((foot,i)=>dist(foot,[a.p[0]+(i?8:-8),a.p[1]])>1)) return;
+     a.paths=null;
+     a.at=a.goal;
+     a.goal=null;
+     a.kind='work';
+     a.age=0;
+     a.work=0;
+     a.visits++;
+     a.last[a.at]=this.clock;
+     a.job=a.at==='desk'?'type':a.at==='blocks'?'stack':a.at==='overlook'?'look':
+       a.at==='stool'?'inspect':this.plank.owner===a.i?'place':'pick';
+     const dwell={type:4.5,stack:3.9,look:2.8,inspect:6.2,pick:3.1,place:3.4};
+     a.dwell=dwell[a.job]+this.r()*1.4;
+     a.climb=0;
+     a.footPitch=[0,0];
+     if (a.job==='stack') this.cube.owner=a.i;
+     this.event('arrive',a.i,a.at);
+     return;
+   }
+   if (!a.seg) {
+     const from=a.node, to=a.route.shift();
+     const next=a.route.length ? terrain(to,a.route[0]) : null;
+     a.seg=segment(from,to,[...a.p],this.point(to),a.surface,next,this.plank.owner===a.i,this.l);
+     a.surface=a.seg.surface;
+     a.node=to;
+   }
+   const g=a.seg;
+   g.elapsed+=dt;
+   const u=clamp(g.elapsed/g.T);
+   const f=progress(g,u);
+   const previous=a.p;
+   a.p=[mix(g.start[0],g.end[0],f),mix(g.start[1],g.end[1],f)];
+   const heading = (start,end) => Math.max(-1.32,Math.min(1.32,Math.atan2(end[0]-start[0],Math.abs(end[1]-start[1])*.65+8)));
+   const ladderFacing = Math.PI - .16;
+   let target=g.surface==='ladder'?ladderFacing:heading(g.start,g.end);
+   if (g.surface!=='ladder' && a.route.length && terrain(g.to,a.route[0])==='ladder') {
+     target+=turnDelta(target,ladderFacing)*sm(clamp((u-.22)/.78));
+   }
+   if (a.route.length && g.surface===terrain(g.to,a.route[0])) {
+     const ahead=heading(g.end,this.point(a.route[0]));
+     target+=turnDelta(target,ahead)*sm(clamp((u-.55)/.45))*.64;
+   }
+   a.yaw+=Math.max(-.16,Math.min(.16,turnDelta(a.yaw,target)*dt*4.2));
+   a.yaw=turnDelta(0,a.yaw);
+   a.gaze=a.yaw+turnDelta(a.yaw,target)*.32;
+   const climbing=g.surface==='ladder'?1:0;
+   a.climb+=(climbing-a.climb)*dt*7;
+   a.steps+=dist(previous,a.p);
+   updateFeet(a,g,u,dt);
+   if (u===1) a.seg=null;
+ }
+ tick() {
+   this.clock+=dt;
+   let dispatch=false;
+   for(const a of this.a) {
+     if(a.kind==='travel') {
+       this.walk(a);
+       if(a.kind==='work') dispatch=true;
+       continue;
+     }
+     a.age+=dt;
+     if(a.kind!=='work') continue;
+     if(a.job==='type') {
+       if(a.riseAt!=null) {
+         a.work=mix(seatedWork,1,clamp((this.clock-a.riseAt)/leaveChairSeconds));
+         if(a.work>=1) {
+           this.event('typed',a.i,a.at);
+           this.depart(a);
+           dispatch=true;
+         }
+       } else {
+         a.work=Math.min(seatedWork,a.age/a.dwell);
+         if(a.work===seatedWork&&!this.queue.includes(a.i)) {
+           this.queue.push(a.i);
+           dispatch=true;
+         }
+       }
+       continue;
+     }
+     a.work=clamp(a.age/a.dwell);
+     if(a.job==='pick'&&a.work>=.5&&this.plank.owner===null) {
+       if(this.plank.at!==a.at) throw Error('wrong pick');
+       this.plank.owner=a.i;
+       this.plank.at=null;
+       this.event('pickup',a.i,a.at);
+     }
+     if(a.job==='place'&&a.work>=.5&&this.plank.owner===a.i) {
+       this.plank.owner=null;
+       this.plank.at=a.at;
+       a.deliver=null;
+       this.event('placed',a.i,a.at);
+     }
+     if(a.work>=1) {
+       if(a.job==='stack') {this.cube.owner=null;this.event('stacked',a.i,a.at);}
+       a.kind='wait';
+       this.queue.push(a.i);
+       dispatch=true;
+     }
+   }
+   if(dispatch) {
+     for(const i of [...this.queue]) {
+       if(this.choose(this.a[i])) this.queue.splice(this.queue.indexOf(i),1);
+     }
+   }
+ }
 }

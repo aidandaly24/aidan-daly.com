@@ -1,6 +1,6 @@
 import { Euler, Group, Quaternion, Vector3 } from './vendor/package/build/three.module.js';
 
-const up = new Vector3(0, 1, 0);
+const right = new Vector3(1, 0, 0);
 const point = object => object.getWorldPosition(new Vector3());
 const orientation = object => object.getWorldQuaternion(new Quaternion());
 
@@ -77,24 +77,27 @@ export function bindAidan(model, height) {
     body.rotation.y = pose.yaw - restYaw;
     const yaw = body.quaternion;
     body.position.copy(pose.hip.clone().sub(point(hip)));
-    const tilt = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), pose.lean);
+    const tilt = new Quaternion().setFromEuler(new Euler(pose.lean, pose.twist ?? 0, pose.bank ?? 0, 'YXZ'));
     orient(chest, yaw.clone().multiply(tilt).multiply(chestRest));
     const glance = new Quaternion().setFromEuler(new Euler(pose.head.x,
       pose.head.y - pose.yaw, pose.head.z, 'YXZ'));
     orient(head, yaw.clone().multiply(glance).multiply(headRest));
 
-    function goal(c, contact, bend, pitch, weight) {
+    function goal(c, contact, bend, pitch, weight, wristTurn) {
       c.a = c.restA * pose.size;
       c.b = c.restB * pose.size;
-      const rotation = yaw.clone().multiply(new Quaternion().setFromAxisAngle(new Vector3(1,0,0), pitch)).multiply(c.rest);
+      const rotation = yaw.clone().multiply(new Quaternion().setFromAxisAngle(right, pitch)).multiply(c.rest);
+      if (wristTurn && pose.toolAxis) {
+        rotation.premultiply(new Quaternion().setFromAxisAngle(pose.toolAxis,wristTurn));
+      }
       const end = contact.clone().sub(c.offset.clone().multiplyScalar(pose.size).applyQuaternion(rotation));
       return { chain: c, end, bend, rotation, weight, root: point(c.upper) };
     }
     const goals = arms.map((c, i) => ({
-      ...goal(c, pose.palms[i], pose.elbows[i], pose.wristPitch, pose.handContact),
+      ...goal(c, pose.palms[i], pose.elbows[i], pose.wristPitch, pose.handContact, i === 0 ? pose.toolTurn : 0),
       bendDirection: pose.elbowDirections?.[i],
     }));
-    legs.forEach((c, i) => goals.push(goal(c, pose.soles[i], pose.knees[i], 0, 1)));
+    legs.forEach((c, i) => goals.push(goal(c, pose.soles[i], pose.knees[i], pose.footPitch?.[i] ?? 0, 1)));
     // Find the closest usable pelvis position for the planted soles and hands.
     // Each fixed-length chain gives a sphere of reachable root translations.
     const shift = new Vector3();

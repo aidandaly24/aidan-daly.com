@@ -1,4 +1,10 @@
-import { WebGLRenderer } from './vendor/package/build/three.module.js';
+import { PCFShadowMap, WebGLRenderer } from './vendor/package/build/three.module.js';
+import { batchScenery } from './set/batch.mjs';
+import { createSoftLighting, softenSetShadows } from './soft-light.mjs';
+import { buildDiorama } from './set/finished.mjs';
+import { loadSurfaceSamples } from './surface-finish.mjs';
+import { castActorShadow, lightSet, studioEnvironment } from './studio.mjs';
+import { frameCity } from './framing.mjs';
 import { City, dt } from './city.mjs';
 import { createView } from './scene.mjs';
 import { modelURL } from './vendor/actor.mjs';
@@ -16,17 +22,17 @@ for (const actor of city.a) {
   actor.age = actor.dwell * actor.work;
 }
 const views = new Map();
-const frontLayers = [...figure.querySelectorAll('.front')];
-const frontCrops = [
-  [[251, 788, 75], [500, 630, 641]],
-  [[266, 1162, 77], [130, 821, 601]],
-];
+const heading = document.getElementById('coming-soon');
+const masthead = document.querySelector('.masthead');
+const footer = document.querySelector('.world footer');
 let view;
 let frame = 0;
 let previousTime = null;
 let remainder = 0;
 let renderer;
 let actors;
+let environment;
+let softLighting;
 
 async function loadActor() {
   const [{GLTFLoader}, {MeshoptDecoder}, {clone}, {bindAidan}] = await Promise.all([
@@ -38,15 +44,17 @@ async function loadActor() {
   const {scene} = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(modelURL);
   lightActor(scene);
   actors = [bindAidan(clone(scene), 218), bindAidan(clone(scene), 218)];
+  actors.forEach(castActorShadow);
   view.setActors(actors);
   canvas.dataset.character = 'aidan';
   render();
+  figure.dataset.ready = 'true';
   updatePlayback();
 }
 
 function render() {
   view.sync(city);
-  renderer.render(view.scene, view.cam);
+  softLighting.render(view.scene, view.cam);
 }
 function advance(time) {
   // Low frame rates still run on wall time. A long foreground stall catches
@@ -70,22 +78,25 @@ function updatePlayback() {
 function resize() {
   const layout = Number(narrow.matches);
   city.setLayout(layout);
-  if (!views.has(layout)) views.set(layout, createView(layout, () => { if (view) render(); }));
+  if (!views.has(layout)) {
+    const created = createView(layout, () => { if (view) render(); });
+    const set = buildDiorama(layout, () => { if (view) render(); });
+    created.setEnvironment(set);
+    lightSet(created, environment, layout === 1);
+    softenSetShadows(created,layout === 1);
+    batchScenery(set);
+    views.set(layout, created);
+  }
   const next = views.get(layout);
   if (next !== view) {
     view = next;
     if (actors) view.setActors(actors);
     else if (modelURL) view.figs.forEach(figure => { figure.base.visible = false; });
-    const name = layout ? 'portrait' : 'desktop';
-    for (const [i, layer] of frontLayers.entries()) {
-      const [x, y, w] = frontCrops[layout][i];
-      layer.src = new URL('./art/' + name + '-' + (i ? 'rail' : 'armrest') + '.png', import.meta.url);
-      layer.style.left = (100 * x / view.w) + '%';
-      layer.style.top = (100 * y / view.h) + '%';
-      layer.style.width = (100 * w / view.w) + '%';
-    }
   }
-  const { width, height } = figure.getBoundingClientRect();
+  const { top, width, height } = figure.getBoundingClientRect();
+  frameCity(view.cam, layout, width, height,
+    heading.getBoundingClientRect().bottom - top, footer.getBoundingClientRect().top - top,
+    masthead.getBoundingClientRect().bottom - top);
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.6));
   renderer.setSize(Math.ceil(width), Math.ceil(height), false);
   render();
@@ -96,13 +107,27 @@ try {
   console.warn('Bookshelf City could not start WebGL.', error);
 }
 if (renderer) {
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = PCFShadowMap;
+  softLighting = createSoftLighting(renderer);
+  environment = studioEnvironment();
+  loadSurfaceSamples(() => { if (view) render(); });
   renderer.setClearColor(0, 0);
-  canvas.addEventListener('webglcontextlost', updatePlayback);
-  canvas.addEventListener('webglcontextrestored', () => { resize(); updatePlayback(); });
+  canvas.addEventListener('webglcontextlost', event => {
+    event.preventDefault();
+    delete figure.dataset.ready;
+    updatePlayback();
+  });
+  canvas.addEventListener('webglcontextrestored', () => {
+    resize();
+    if (actors) figure.dataset.ready = 'true';
+    updatePlayback();
+  });
   document.addEventListener('visibilitychange', updatePlayback);
   reduced.addEventListener('change', updatePlayback);
   narrow.addEventListener('change', resize);
-  new ResizeObserver(resize).observe(figure);
+  const observer = new ResizeObserver(resize);
+  for (const element of [figure, heading, masthead, footer]) observer.observe(element);
   resize();
   canvas.dataset.character = modelURL ? 'loading' : 'mechanics';
   if (modelURL) loadActor().catch(error => {
