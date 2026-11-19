@@ -1,0 +1,55 @@
+@font-face {
+  font-family: "DM Sans";
+  src: url("./brand/dm-sans.ttf") format("truetype");
+  font-display: swap;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: linear-gradient(#ebd5c4, #ecd3c2);
+  color: #45483f;
+  font-family: "DM Sans", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+main { min-height: 100svh; min-height: 100dvh; display: grid; place-items: center; }
+.world {
+  position: relative;
+  width: min(100vw, 150dvh);
+  aspect-ratio: 1536 / 1024;
+  isolation: isolate;
+  container-type: inline-size;
+}
+figure, figure picture, .plate, canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  display: block;
+}
+figure { overflow: hidden; pointer-events: none; }
+.front { position: absolute; height: auto; pointer-events: none; }
+.front:not([src]) { display: none; }
+.masthead { position: absolute; left: 4.17%; right: 4.17%; top: 3.61%; }
+.wordmark { display: block; width: 13.7%; min-width: 120px; height: auto; }
+.intro { position: absolute; left: 20%; right: 20%; top: 11.4%; text-align: center; }
+.intro p { font-size: clamp(14px, 1.5cqw, 26px); line-height: 1.4; margin: 0; }
+h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(32px, 4.95cqw, 90px);
+  font-weight: 400;
+  letter-spacing: -.035em;
+  line-height: 1.08;
+  margin: 2cqw 0 0;
+}
+footer { position: absolute; bottom: 1.8%; left: 4.17%; color: #8c8a7e; font-size: clamp(7px, .59cqw, 11px); letter-spacing: .2em; }
+@media (max-aspect-ratio: 23/25) {
+  body { background: linear-gradient(#f2d7c5, #efd3bc); }
+  .world { width: min(100vw, 57.142857dvh); aspect-ratio: 948 / 1659; }
+  .masthead { left: 6%; right: 6%; top: 4.2%; }
+  .wordmark { width: 44%; min-width: 0; }
+  .intro { left: 5%; right: 5%; top: 12.3%; }
+  .intro p { font-size: clamp(14px, 4.3cqw, 22px); }
+  h1 { font-size: clamp(32px, 10.5cqw, 58px); margin-top: 4cqw; }
+  footer { left: 6%; bottom: 2.6%; font-size: clamp(7px, 1.9cqw, 10px); }
+}
