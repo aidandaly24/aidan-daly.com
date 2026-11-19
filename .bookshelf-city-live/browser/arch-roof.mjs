@@ -67,9 +67,9 @@ export function createArchRoof(layout, height, redraw) {
       redraw?.();
     });
   }
-  // One palm near the crest and one on the lower slope. Place the nearer
-  // hand toward the visible edge so its wrist reaches in front of the body.
+  // The far hand steadies the crest. The near hand supports the underside
+  // at the eave and stays visible in front of the cotton shirt.
   const grips = [top.clone().lerp(right,.18).addScaledVector(depth,.32),
-    top.clone().lerp(right,.76).addScaledVector(depth,.16)];
+    lower[1].clone().lerp(lower[0],.11).addScaledVector(depth,.30)];
   return {mesh,home,grips};
 }

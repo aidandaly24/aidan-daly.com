@@ -145,7 +145,7 @@ bodyMotion.turn=(bodyMotion.turn??0)+stepTurn*filter;
 bodyMotion.time=c.clock;
 turn+=bodyMotion.turn;
 if(isWork){
-  const aim=a.job==='type'?1.07:a.job==='stack'?-1.08:a.job==='look'?-.8:repairing?Math.atan2(repairing.gaze.x-d.x,repairing.gaze.z-d.z):a.job==='inspect'?1.05:a.yaw;
+  const aim=a.job==='type'?1.07:a.job==='stack'?-.57:a.job==='look'?-.8:repairing?Math.atan2(repairing.gaze.x-d.x,repairing.gaze.z-d.z):a.job==='inspect'?1.05:a.yaw;
   turn+=turnDelta(turn,aim)*pres;
 }
 let rt=V(Math.cos(turn),0,-Math.sin(turn)),fw=V(Math.sin(turn),0,Math.cos(turn));
@@ -158,7 +158,9 @@ if (travelSoles?.every(Boolean)) {
 const desk = nodes.desk[l], floor = nodes.floor[l];
 const toDesk = Math.hypot(a.p[0]-desk[0],a.p[1]-desk[1]);
 const deskApproach = 1 - sm(clamp(toDesk / Math.hypot(floor[0]-desk[0],floor[1]-desk[1])));
-const actorSize=1+.58*deskApproach;
+const nearBlocks=1-ramp(Math.hypot(a.p[0]-nodes.blocks[l][0],a.p[1]-nodes.blocks[l][1]),30,335);
+// Ease between the authored foreground and upper-book character scales along the approach.
+const actorSize=1+.58*deskApproach+.29*nearBlocks;
 const aboveFeet=h-nodes.ladder1[l][1]-d.y;
 const aboveLanding=d.y-(h-nodes.ladder0[l][1]);
 const climbGrip=(a.climb??0)*ramp(aboveFeet,28,95)*ramp(aboveLanding,0,40);
@@ -167,13 +169,15 @@ let hip=d.clone().add(V(0,hipHeight+roll,0)).addScaledVector(rt,support*6);
 let seat=l?V(301,h-1191,18):V(285,h-815,17);
 if(ground) seat=ground.anchor('seat',seat,'desk');
 hip.lerp(seat,seated);
-hip.x-=build*2;
-hip.z-=build*6;
-hip.y-=build*19;
+// At the toy arch he settles onto his heels, beside the tower, with the
+// forward knee turned out. Keep his face clear of the piece as he lifts it.
+hip.x+=build*16;
+hip.z-=build*33;
+hip.y-=build*74;
 hip.addScaledVector(fw,inspect*14);
 hip.y-=inspect*55;
 const deskLean=keyboard*(phrase?.read??0);
-const lean=seated*4+build*9+inspect*10+deskLean*3;
+const lean=seated*4+build*13+inspect*10+deskLean*3;
 const shoulder=hip.clone().add(V(0,69+seated*25,0)).addScaledVector(fw,lean);
 const head=shoulder.clone().add(V(0,31+seated*14,0)).addScaledVector(fw,4);
 const survey=a.job==='look'&&isWork?.52*(ramp(t,.08,.30)-2*ramp(t,.36,.63)+ramp(t,.73,.98)):0;
@@ -181,7 +185,7 @@ let gaze=travelling?(a.gaze??a.yaw)+bodyMotion.turn:turn+survey;
 gaze += keyboard*(phrase ? .15*phrase.read-.075*phrase.rightRow*(1-phrase.read) : 0);
 gaze += attention*.26;
 const handling=isWork&&['pick','place'].includes(a.job);
-let downward=keyboard*(.20-.23*(phrase?.read??0))+build*.21+inspect*.30+(handling?pres*.22:0);
+let downward=keyboard*(.20-.23*(phrase?.read??0))+build*.29+inspect*.30+(handling?pres*.22:0);
 downward+=idle*(a.job==='stack'||a.job==='inspect'?.18:.06)+attention*.045;
 if (repairing) {
   const toTarget = repairing.gaze.clone().sub(head);
@@ -207,12 +211,22 @@ if (isWork && a.job === 'pick') {
   dockTurn = sm(clamp(t / .5));
 }
 const propYaw = carryYaw + dockTurn * Math.atan2(Math.sin(dockYaw - carryYaw), Math.cos(dockYaw - carryYaw));
-let roofMove=build>0 ? ramp(t,.22,.45)*(1-ramp(t,.54,.82)) : 0;let roofP=roofRest.clone().add(V(14*roofMove,32*roofMove,0));
+let roofMove=build>0 ? ramp(t,.22,.45)*(1-ramp(t,.54,.82)) : 0;let roofP=roofRest.clone().add(V(-4*roofMove,12*roofMove,2*roofMove));
 for(let i of[0,1]){let s=i?1:-1,leg=f.legs[i],arm=f.arms[i],H=hip.clone().addScaledVector(rt,11*s),foot=a.feet[i];
 const pitch=a.footPitch?.[i]??0;
 const soleTarget=l?(i?[368,1287]:[337,1275]):(i?[340,914]:[317,906]);
 let planted=travelSoles?.[i] ?? ground?.sole(a,i,9*s) ?? V(foot[0],h-foot[1]+foot[2],d.z+9*s);
 if (repairing) planted=stoolTool.foot(planted,i);
+if (build && ground) {
+  const folded=ground.at('blocks',i ? 7 : 5,i ? 21 : -39);
+  if(folded) {
+    // Fold one leg at a time. The second shoe bears his weight as the first
+    // lifts, swings and settles. Reverse that order as he stands to leave.
+    const fold=i ? window(t,.11,.21,.82,.90) : window(t,.015,.105,.905,.995);
+    planted.lerp(folded,fold);
+    planted.y+=9*Math.sin(Math.PI*fold);
+  }
+}
 const F=planted.add(V(0,5+Math.abs(Math.sin(pitch))*9,0));
 if(brace) {
   const seatSole=ground?.sample(soleTarget,'desk','desk',-38+9*s)?.point ??
@@ -224,6 +238,10 @@ let K=joint(H,F,fw.clone().add(V(0,0,.25)),53,53);
 // descending to the floor. Use its centers in each registered composition.
 const seatedKnee=l?(i?[361,1187]:[342,1186]):(i?[341,816]:[322,815]);
 leg.knee.copy(K).lerp(V(seatedKnee[0],h-seatedKnee[1],F.z),seated);
+if (build) {
+  const forwardKnee=d.clone().add(V(i ? 54 : -12,21,i ? 8 : 9));
+  leg.knee.lerp(forwardKnee,build);
+}
 if (repairing && i===0) {
   leg.knee.lerp(planted.clone().add(V(24,3,8)),repairing.kneel);
 }
@@ -279,7 +297,11 @@ if (repairing) {
 }
 let onRoof=build;hand.lerp(roofP.clone().add(roofGrips[i]),onRoof);
 if(carry||isWork&&['pick','place'].includes(a.job)){let w=carry?1:window(t,.04,.21,.82,.99);hand.lerp(boardHand.clone().add(palmOffsets[i].clone().applyAxisAngle(Y,propYaw)),w)}
-let E=joint(S,hand,fw.clone().multiplyScalar(-.38).addScaledVector(rt,s*.5).add(V(0,-.7,0)),42,42);arm.elbow.copy(E);arm.upper(S,E);arm.lower(E,hand);arm.p.position.copy(hand);arm.p.rotation.y=turn}
+let E=joint(S,hand,fw.clone().multiplyScalar(-.38).addScaledVector(rt,s*.5).add(V(0,-.7,0)),42,42);if (build) {
+  const outside=hip.clone().addScaledVector(rt,30*s).addScaledVector(fw,37).add(V(0,47,0));
+  E.lerp(outside,build);
+}
+arm.elbow.copy(E);arm.upper(S,E);arm.lower(E,hand);arm.p.position.copy(hand);arm.p.rotation.y=turn}
 if (nativeActors) {
   const gripWeight = carry ? 1 : handling ? window(t,.04,.21,.82,.99) : 0;
   // Use a direction from the real shoulder. The mechanics stand-in's
@@ -295,9 +317,9 @@ if (nativeActors) {
   });
   nativeActors[a.i].sync({
     size: actorSize, yaw: turn, hip, head: f.head.rotation,
-    lean: seated*.22+deskLean*.09+keyboard*(phrase?.breath??0)*.015+build*.18+inspect*.58+low*.95+stride*.075+(a.climb??0)*.16,
+    lean: seated*.22+deskLean*.09+keyboard*(phrase?.breath??0)*.015+build*.25+inspect*.58+low*.95+stride*.075+(a.climb??0)*.16,
     twist: (carry ? support*.045 : support*.17) + attention*.042 + deskLean*.045, bank: support*.085+attention*.018,
-    footPitch: a.footPitch,
+    footPitch: a.footPitch, footYaw: build ? [-.16*build, -.93*build] : undefined,
     palms: freeHands, elbows: f.arms.map(arm => arm.elbow), elbowDirections, elbowDirectionWeight,
     soles: f.legs.map(leg => leg.sole), knees: f.legs.map(leg => leg.knee),
     handContact: contact, wristPitch: -1.2*contact,

@@ -3,6 +3,9 @@ import test from 'node:test';
 import {Raycaster, Vector3} from '../.bookshelf-city-live/browser/vendor/package/build/three.module.js';
 import {buildDiorama} from '../.bookshelf-city-live/browser/set/finished.mjs';
 
+import {City} from '../.bookshelf-city-live/browser/city.mjs';
+import {createView} from '../.bookshelf-city-live/browser/scene.mjs';
+
 for (const [layout, label] of ['desktop','portrait'].entries()) {
   test(label + ' has six exposed rungs, five casters and three wooden stool legs', () => {
     const set = buildDiorama(layout);
@@ -23,5 +26,34 @@ for (const [layout, label] of ['desktop','portrait'].entries()) {
       const first = ray.intersectObjects(solids,false)[0]?.object;
       assert.equal(first?.name,'Maple ladder rung','Rung '+(i+1)+' is covered by '+first?.name);
     }
+  });
+
+  test(label + ' builder folds one leg at a time and supports the roof while moving it', () => {
+    const view=createView(layout);
+    view.setEnvironment(buildDiorama(layout));
+    const city=new City(9,layout);
+    const builder=city.a[1];
+    const figure=view.figs[1];
+    let previous, rest, lift=0;
+    for(let step=0;step<=120;step++) {
+      builder.work=step/120;
+      view.sync(city);
+      const soles=figure.legs.map(leg=>leg.sole.clone());
+      if(previous) {
+        const travel=soles.map((sole,i)=>sole.distanceTo(previous[i]));
+        assert(Math.min(...travel)<.001,'Both shoes slid at once.');
+      }
+      previous=soles;
+      if(step===0) rest=view.roof.position.y;
+      lift=Math.max(lift,view.roof.position.y-rest);
+      if(builder.work>=.22 && builder.work<=.82) {
+        view.roofGrips.forEach((grip,i)=>{
+          const surface=view.roof.localToWorld(grip.clone());
+          assert(surface.distanceTo(figure.arms[i].p.position)<.001);
+        });
+      }
+    }
+    assert(lift>6);
+    assert(Math.abs(view.roof.position.y-rest)<.001);
   });
 }

@@ -1,6 +1,6 @@
 import { Euler, Group, Quaternion, Vector3 } from './vendor/package/build/three.module.js';
 
-const right = new Vector3(1, 0, 0);
+const right = new Vector3(1, 0, 0), up = new Vector3(0, 1, 0);
 const point = object => object.getWorldPosition(new Vector3());
 const orientation = object => object.getWorldQuaternion(new Quaternion());
 
@@ -83,10 +83,12 @@ export function bindAidan(model, height) {
       pose.head.y - pose.yaw, pose.head.z, 'YXZ'));
     orient(head, yaw.clone().multiply(glance).multiply(headRest));
 
-    function goal(c, contact, bend, pitch, weight, wristTurn) {
+    function goal(c, contact, bend, pitch, weight, wristTurn, footTurn = 0) {
       c.a = c.restA * pose.size;
       c.b = c.restB * pose.size;
-      const rotation = yaw.clone().multiply(new Quaternion().setFromAxisAngle(right, pitch)).multiply(c.rest);
+      const rotation = yaw.clone();
+      if (footTurn) rotation.multiply(new Quaternion().setFromAxisAngle(up, footTurn));
+      rotation.multiply(new Quaternion().setFromAxisAngle(right, pitch)).multiply(c.rest);
       if (wristTurn && pose.toolAxis) {
         rotation.premultiply(new Quaternion().setFromAxisAngle(pose.toolAxis,wristTurn));
       }
@@ -97,7 +99,7 @@ export function bindAidan(model, height) {
       ...goal(c, pose.palms[i], pose.elbows[i], pose.wristPitch, pose.handContact, i === 0 ? pose.toolTurn : 0),
       bendDirection: pose.elbowDirections?.[i],
     }));
-    legs.forEach((c, i) => goals.push(goal(c, pose.soles[i], pose.knees[i], pose.footPitch?.[i] ?? 0, 1)));
+    legs.forEach((c, i) => goals.push(goal(c, pose.soles[i], pose.knees[i], pose.footPitch?.[i] ?? 0, 1, 0, pose.footYaw?.[i])));
     // Find the closest usable pelvis position for the planted soles and hands.
     // Each fixed-length chain gives a sphere of reachable root translations.
     const shift = new Vector3();
